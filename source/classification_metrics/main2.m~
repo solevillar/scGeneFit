@@ -1,0 +1,127 @@
+function benchmarks(data, labels, markers)
+
+[d,N]=size(data);
+l=labels;
+
+%split in test and training
+rng default
+n=ceil(N*0.7);
+n_test=N-n;
+I=randperm(N,n);
+data1=G(:,I);
+labels1=l(I);
+test_data=G;
+test_data(:,I)=[];
+test_labels=l;
+test_labels(I)=[];
+
+data=G;
+%k=5;
+%baseline_performance
+%baseline=nearest_neighbors_classifier(data, labels, eye(d), test_data, test_labels, k)
+
+
+%sampling
+L=size(unique(labels),1);
+count=zeros(L,1);
+s=0;
+for i=1:L
+    count(i)=sum(labels==i);
+    s=s+max(20, ceil(count(i)/10));
+end
+s
+subsample=zeros(d, s);
+sublabels=zeros(s, 1);
+idx=0;
+for i=1:L
+    aux=data(:,labels==i);
+    auxl=labels(labels==i);
+    N= max(20,ceil(count(i)/10));
+    I=randperm(size(aux,2), N);
+    subsample(:,idx+1:idx+N)=aux(:,I);
+    sublabels(idx+1:idx+N)=auxl(I);
+    idx=idx+N;
+end
+
+tic
+[Delta,smallest,lambda]=select_constraints_new(subsample, sublabels,3);
+toc
+tic
+num_markers=13;
+MM=sqz_matlab_hinge_new(Delta,smallest/5, num_markers, lambda');
+toc
+
+
+[~,aux]=maxk(MM,num_markers);
+markers=MM*0;
+markers(aux)=1;
+idx=markers>0;
+
+P=G(idx,:);
+k=5
+error=kmeans_classification_error(P, 13, labels)
+%sqz_error_cheat=nearest_neighbors_classifier(G, labels, diag(idx), test_data, test_labels, k)
+sqz_error=nearest_neighbors_classifier(data1, labels1, diag(idx), test_data, test_labels, k)
+
+
+%csvwrite('real_result30.txt',M)
+%csvwrite('real_result.mat')
+
+
+auxl=readtable('cluster_labels_test.csv');
+auxl=auxl(:,2);
+auxl=table2cell(auxl);
+
+
+% P=tsne(G(idx,:)');
+% 
+% figure;
+% Q=P;
+% 
+% gscatter(Q(:,1), Q(:,2),auxl);
+% % Create a legend with 3 entries
+% [h,icons] = legend;
+% aux=h.String;
+% [h,icons] = legend(aux);
+% h.Location='bestoutside';
+% % Find the 'line' objects
+% icons = findobj(icons,'Type','line');
+% % Find lines that use a marker
+% icons = findobj(icons,'Marker','none','-xor');
+% % Resize the marker in the legend
+% set(icons,'MarkerSize',50);
+% set(gca,'FontSize',20)
+% legend('Location', 'bestoutside')
+%  xticks([])
+%   yticks([])
+
+S=G(idx,:);  
+aux=0.01*randn(size(S));
+rng default
+P=tsne(G(idx,:)'+aux');
+
+figure;
+Q=P;
+  
+gscatter(Q(:,1), Q(:,2),auxl);
+  [h,icons] = legend;
+aux=h.String;
+[h,icons] = legend(aux);
+h.Location='bestoutside';
+% Find the 'line' objects
+icons = findobj(icons,'Type','line');
+% Find lines that use a marker
+icons = findobj(icons,'Marker','none','-xor');
+% Resize the marker in the legend
+set(icons,'MarkerSize',50);
+set(gca,'FontSize',20)
+xticks([])
+  yticks([])
+  
+
+num_markers=sum(idx)
+markers_filename='./RESULTS_FEB20/citeseq_data_'+string(num_markers)+'markers.csv';
+csvwrite(markers_filename,idx);
+
+plot_filename='./RESULTS_FEB20/citeseq_plot_'+string(num_markers)+'markers.pdf';
+saveas(gcf, plot_filename)
